@@ -1,0 +1,53 @@
+name = "polar-auth-starter-api"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+minify = true
+
+# Custom domain (optional) — uncomment and adjust once you own one:
+# routes = [
+#   { pattern = "api.example.com", custom_domain = true },
+# ]
+
+[vars]
+NODE_ENV = "production"
+# "sandbox" while testing; switch to "production" with a production Polar org token.
+POLAR_SERVER = "sandbox"
+# Public URL of this worker (used as better-auth baseURL). With a custom domain:
+# "https://api.example.com"; otherwise the workers.dev URL.
+BETTER_AUTH_URL = "https://polar-auth-starter-api.<your-subdomain>.workers.dev"
+# Frontend app URL — trusted origin, CORS and checkout redirects.
+WEB_URL = "https://example.com"
+# Product catalog (see src/products.ts) — product IDs from the Polar dashboard.
+# Leave a var empty to drop that product from the catalog.
+POLAR_PRO_MONTHLY_PRODUCT_ID = ""
+POLAR_PRO_ANNUAL_PRODUCT_ID = ""
+POLAR_TEAM_MONTHLY_PRODUCT_ID = ""
+POLAR_TEAM_ANNUAL_PRODUCT_ID = ""
+# Email sender identity (optional — defaults to "Acme <noreply@example.com>")
+# EMAIL_FROM = "noreply@example.com"
+# EMAIL_FROM_NAME = "Acme"
+# Mobile deep-link scheme (optional — defaults to "polarstarter")
+# MOBILE_APP_SCHEME = "polarstarter"
+# Secrets (set via: wrangler secret put <NAME>)
+# BETTER_AUTH_SECRET       — generate: openssl rand -base64 32
+# GITHUB_CLIENT_ID
+# GITHUB_CLIENT_SECRET
+# GOOGLE_CLIENT_ID
+# GOOGLE_CLIENT_SECRET
+# POLAR_ACCESS_TOKEN       — Organization Access Token from Polar settings
+# POLAR_WEBHOOK_SECRET     — from Polar webhook dashboard
+
+[[send_email]]
+name = "EMAIL"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "polar-auth-starter"
+database_id = "00000000-0000-0000-0000-000000000000" # replace with output of: wrangler d1 create polar-auth-starter
+migrations_dir = "../../packages/db/migrations"
+
+[observability]
+[observability.logs]
+enabled = true
+invocation_logs = true

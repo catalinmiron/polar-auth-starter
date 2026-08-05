@@ -1,0 +1,31 @@
+{
+  "name": "@repo/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "build": "wrangler deploy --dry-run",
+    "deploy": "wrangler deploy",
+    "db:migrate:local": "wrangler d1 migrations apply polar-auth-starter --local",
+    "db:migrate:remote": "wrangler d1 migrations apply polar-auth-starter --remote",
+    "lint": "oxlint --config ../../oxlint.json src/",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@better-auth/expo": "^1.6.9",
+    "@polar-sh/better-auth": "^1.8.4",
+    "@polar-sh/sdk": "^0.47.0",
+    "@repo/db": "workspace:*",
+    "@repo/types": "workspace:*",
+    "better-auth": "^1.6.9",
+    "drizzle-orm": "^0.44.0",
+    "hono": "^4.7.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250422.0",
+    "typescript": "~6.0.3",
+    "wrangler": "4.86.0"
+  }
+}

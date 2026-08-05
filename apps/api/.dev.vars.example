@@ -1,0 +1,38 @@
+# Copy to .dev.vars (gitignored) for local dev with `wrangler dev`.
+# Everything except BETTER_AUTH_SECRET is optional locally — OAuth providers
+# stay disabled and Polar calls no-op / fail soft when unset, and emails are
+# logged to the console instead of sent.
+
+NODE_ENV=development
+BETTER_AUTH_URL=http://localhost:8787
+WEB_URL=http://localhost:3000
+
+# Required — generate with: openssl rand -base64 32
+BETTER_AUTH_SECRET=replace-with-a-32-char-random-secret
+
+# Allow sign-in without a verified email while developing
+REQUIRE_EMAIL_VERIFICATION=false
+
+# OAuth (optional — provider is enabled only when both values are set)
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+
+# Polar (sandbox) — https://sandbox.polar.sh
+POLAR_SERVER=sandbox
+POLAR_ACCESS_TOKEN=
+POLAR_WEBHOOK_SECRET=
+
+# Product catalog (see src/products.ts) — sandbox product IDs
+POLAR_PRO_MONTHLY_PRODUCT_ID=
+POLAR_PRO_ANNUAL_PRODUCT_ID=
+POLAR_TEAM_MONTHLY_PRODUCT_ID=
+POLAR_TEAM_ANNUAL_PRODUCT_ID=
+
+# Email sender identity (optional)
+EMAIL_FROM=noreply@example.com
+EMAIL_FROM_NAME=Acme
+
+# Mobile deep-link scheme (optional)
+MOBILE_APP_SCHEME=polarstarter

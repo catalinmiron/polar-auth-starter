@@ -1,0 +1,24 @@
+{
+  "name": "@repo/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "generate": "drizzle-kit generate",
+    "studio:local": "drizzle-kit studio --config drizzle.local.config.ts",
+    "lint": "oxlint --config ../../oxlint.json src/",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.44.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250422.0",
+    "better-sqlite3": "^12.9.0",
+    "drizzle-kit": "^0.30.0",
+    "typescript": "~6.0.3"
+  }
+}

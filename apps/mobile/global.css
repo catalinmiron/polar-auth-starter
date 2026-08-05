@@ -1,0 +1,40 @@
+@import 'tailwindcss';
+@import 'uniwind';
+
+/* Design tokens. The base @theme block is the LIGHT theme; the @variant dark
+   block inside @layer theme overrides the same tokens for the dark theme.
+   Utilities like `bg-background` / `text-muted` resolve per-theme automatically,
+   so components rarely need explicit `dark:` variants. */
+@theme {
+  --color-background: oklch(0.98 0.003 265);
+  --color-surface: oklch(1 0 0);
+  --color-surface-secondary: oklch(0.94 0.006 265);
+  --color-surface-tertiary: oklch(0.9 0.008 265);
+  --color-foreground: oklch(0.18 0.02 265);
+  --color-muted: oklch(0.52 0.02 265);
+  --color-faint: oklch(0.68 0.015 265);
+  --color-accent: oklch(0.63 0.18 35);
+  --color-accent-foreground: oklch(0.99 0 0);
+  --color-separator: oklch(0.9 0.01 265);
+  --color-danger: oklch(0.55 0.2 25);
+  --color-success: oklch(0.6 0.15 150);
+  --color-warning: oklch(0.7 0.15 80);
+}
+
+@layer theme {
+  @variant dark {
+    --color-background: oklch(0.07 0.015 265);
+    --color-surface: oklch(0.1 0.018 265);
+    --color-surface-secondary: oklch(0.13 0.018 265);
+    --color-surface-tertiary: oklch(0.16 0.018 265);
+    --color-foreground: oklch(0.95 0.005 265);
+    --color-muted: oklch(0.65 0.02 265);
+    --color-faint: oklch(0.5 0.02 265);
+    --color-accent: oklch(0.63 0.18 35);
+    --color-accent-foreground: oklch(0.99 0 0);
+    --color-separator: oklch(0.18 0.02 265);
+    --color-danger: oklch(0.65 0.2 25);
+    --color-success: oklch(0.7 0.15 150);
+    --color-warning: oklch(0.75 0.15 80);
+  }
+}

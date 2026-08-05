@@ -1,0 +1,11 @@
+[install]
+# Hoisted (npm/yarn-style flat) node_modules instead of Bun's default isolated linker.
+#
+# React Native requires this. Metro's resolver and Expo's native autolinking both assume a flat
+# tree, whereas the isolated linker creates a separate store entry per peer-dependency context —
+# so the same version of expo / expo-constants / expo-modules-core gets linked several times.
+# `npx expo-doctor` reports those as "Multiple copies of the same version", and for anything with
+# native or JSI state duplicate JS copies genuinely break the app: the native side registers once,
+# so the second copy sees unbound bindings.
+# Key is `linker` (matches `bun install --linker=<isolated|hoisted>`), not `nodeLinker`.
+linker = "hoisted"

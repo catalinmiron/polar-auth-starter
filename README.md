@@ -70,7 +70,9 @@ POLAR_TEAM_MONTHLY_PRODUCT_ID / POLAR_TEAM_ANNUAL_PRODUCT_ID
 
 ### 4. Email
 
-The API uses Cloudflare's `send_email` binding for verification/reset emails, with a `console.log` fallback in local dev (the link is printed to the wrangler console). Note that Cloudflare Email Routing only delivers to **verified destination addresses** — for a real product, swap the `sendEmail` helper in `apps/api/src/auth.ts` for Resend/Postmark/SES. Sender identity is configured via `EMAIL_FROM` / `EMAIL_FROM_NAME`.
+Verification and reset emails go out through Cloudflare's [`send_email` binding](https://developers.cloudflare.com/email-routing/email-workers/send-email-workers/) (already declared in `wrangler.toml`). Enable **Email Routing** on the zone that owns your sender address and set `EMAIL_FROM` / `EMAIL_FROM_NAME` — the from address must belong to that zone. In local dev there is no binding, so the email (with its verification/reset link) is printed to the wrangler console instead.
+
+If you prefer a different provider, the whole integration is one small `sendEmail` helper in `apps/api/src/auth.ts`.
 
 ## Development
 

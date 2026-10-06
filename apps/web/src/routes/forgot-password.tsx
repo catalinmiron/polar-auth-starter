@@ -78,6 +78,7 @@ function ForgotPasswordPage() {
         >
           {error && (
             <div
+              role="alert"
               className="rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-sm"
               style={{ color: 'var(--color-danger)' }}
             >
@@ -88,6 +89,7 @@ function ForgotPasswordPage() {
           <TextField isRequired name="email" className="flex flex-col gap-1.5">
             <Label className="text-sm font-medium text-foreground-2">Email</Label>
             <Input
+              autoFocus
               type="email"
               autoComplete="email"
               value={email}

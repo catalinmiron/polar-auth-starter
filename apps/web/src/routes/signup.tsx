@@ -26,7 +26,7 @@ function SignupPage() {
   const [verificationSent, setVerificationSent] = useState(false)
 
   const socialCallbackURL = checkout
-    ? `${window.location.origin}/checkout?slug=${checkout}`
+    ? `${window.location.origin}/checkout?slug=${encodeURIComponent(checkout)}`
     : `${window.location.origin}/app/profile`
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -99,6 +99,7 @@ function SignupPage() {
         >
           {error && (
             <div
+              role="alert"
               className="rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-sm"
               style={{ color: 'var(--color-danger)' }}
             >
@@ -109,6 +110,7 @@ function SignupPage() {
           <TextField isRequired name="name" className="flex flex-col gap-1.5">
             <Label className="text-sm font-medium text-foreground-2">Name</Label>
             <Input
+              autoFocus
               type="text"
               autoComplete="name"
               value={name}

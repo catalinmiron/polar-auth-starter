@@ -1,6 +1,7 @@
 import { SocialAuthButtons } from '@/components/auth/SocialAuthButtons'
 import { BrandLogo } from '@/components/BrandLogo'
 import { authClient, redirectToCheckout } from '@/lib/auth-client'
+import { safeRedirectPath } from '@/lib/safe-redirect'
 import { Button, Input, Label, TextField } from '@heroui/react'
 import { createFileRoute, Link, useSearch } from '@tanstack/react-router'
 import { useState } from 'react'
@@ -27,13 +28,10 @@ function LoginPage() {
   const [resendSent, setResendSent] = useState(false)
   const [resending, setResending] = useState(false)
 
+  const destination = safeRedirectPath(redirectTo)
   const socialCallbackURL = checkout
-    ? `${window.location.origin}/checkout?slug=${checkout}`
-    : redirectTo
-      ? redirectTo.startsWith('http')
-        ? redirectTo
-        : `${window.location.origin}${redirectTo}`
-      : `${window.location.origin}/app/profile`
+    ? `${window.location.origin}/checkout?slug=${encodeURIComponent(checkout)}`
+    : `${window.location.origin}${destination}`
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -53,7 +51,7 @@ function LoginPage() {
     if (checkout) {
       await redirectToCheckout(checkout)
     } else {
-      window.location.href = redirectTo ?? '/app/profile'
+      window.location.href = destination
     }
   }
 
@@ -89,6 +87,7 @@ function LoginPage() {
         >
           {error && (
             <div
+              role="alert"
               className="rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-sm"
               style={{ color: 'var(--color-danger)' }}
             >
@@ -97,7 +96,7 @@ function LoginPage() {
           )}
 
           {needsVerification && (
-            <div className="rounded-lg border border-line bg-surface px-3 py-2.5 text-sm flex flex-col gap-1.5">
+            <div role="alert" className="rounded-lg border border-line bg-surface px-3 py-2.5 text-sm flex flex-col gap-1.5">
               <span className="font-medium text-foreground">Email not verified</span>
               <span style={{ color: 'var(--color-muted)' }}>Check your inbox for the verification link.</span>
               {resendSent ? (
@@ -122,6 +121,7 @@ function LoginPage() {
           <TextField isRequired name="email" className="flex flex-col gap-1.5">
             <Label className="text-sm font-medium text-foreground-2">Email</Label>
             <Input
+              autoFocus
               type="email"
               autoComplete="email"
               value={email}
@@ -132,16 +132,7 @@ function LoginPage() {
           </TextField>
 
           <TextField isRequired name="password" className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between">
-              <Label className="text-sm font-medium text-foreground-2">Password</Label>
-              <Link
-                to="/forgot-password"
-                className="text-xs underline hover:text-foreground transition-colors"
-                style={{ color: 'var(--color-muted)' }}
-              >
-                Forgot password?
-              </Link>
-            </div>
+            <Label className="text-sm font-medium text-foreground-2">Password</Label>
             <Input
               type="password"
               autoComplete="current-password"
@@ -151,6 +142,14 @@ function LoginPage() {
               variant="secondary"
             />
           </TextField>
+          {/* After the password field, so Tab goes email → password → sign in. */}
+          <Link
+            to="/forgot-password"
+            className="-mt-2 self-end text-xs underline hover:text-foreground transition-colors"
+            style={{ color: 'var(--color-muted)' }}
+          >
+            Forgot password?
+          </Link>
 
           <Button
             type="submit"

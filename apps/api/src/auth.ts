@@ -21,6 +21,9 @@ import type { Env } from './env'
 import { onOrderPaid } from './hooks'
 import { checkoutProducts, planForProduct } from './products'
 
+const escapeHtml = (s: string) =>
+  s.replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]!)
+
 function mapStatus(status: string): 'active' | 'canceled' | 'past_due' {
   if (status === 'canceled') return 'canceled'
   if (status === 'active' || status === 'trialing') return 'active'
@@ -35,7 +38,7 @@ export function createAuth(env: Env) {
 
   // Minimal, unbranded transactional email shell. Swap for your own template.
   const emailHtml = (opts: { heading: string; body: string; ctaLabel: string; ctaUrl: string; footer: string }) =>
-    `<!DOCTYPE html><html><body style="font-family:sans-serif;background:#f5f5f5;color:#1a1a1a;padding:40px 20px;margin:0"><div style="max-width:480px;margin:0 auto;background:#fff;border-radius:12px;padding:32px"><p style="font-size:18px;font-weight:700;margin:0 0 32px;letter-spacing:-0.01em">${fromName}</p><h1 style="font-size:22px;font-weight:600;margin:0 0 12px">${opts.heading}</h1><p style="color:#555;margin:0 0 28px">${opts.body}</p><a href="${opts.ctaUrl}" style="display:inline-block;background:#1a1a1a;color:#fff;text-decoration:none;padding:12px 28px;border-radius:10px;font-size:14px;font-weight:600">${opts.ctaLabel}</a><p style="color:#999;font-size:12px;margin:24px 0 0">${opts.footer}</p></div></body></html>`
+    `<!DOCTYPE html><html><body style="font-family:sans-serif;background:#f5f5f5;color:#1a1a1a;padding:40px 20px;margin:0"><div style="max-width:480px;margin:0 auto;background:#fff;border-radius:12px;padding:32px"><p style="font-size:18px;font-weight:700;margin:0 0 32px;letter-spacing:-0.01em">${escapeHtml(fromName)}</p><h1 style="font-size:22px;font-weight:600;margin:0 0 12px">${opts.heading}</h1><p style="color:#555;margin:0 0 28px">${opts.body}</p><a href="${opts.ctaUrl}" style="display:inline-block;background:#1a1a1a;color:#fff;text-decoration:none;padding:12px 28px;border-radius:10px;font-size:14px;font-weight:600">${opts.ctaLabel}</a><p style="color:#999;font-size:12px;margin:24px 0 0">${opts.footer}</p></div></body></html>`
 
   async function checkSeatLimit(organizationId: string) {
     const [owner] = await db
@@ -81,12 +84,10 @@ export function createAuth(env: Env) {
 
     trustedOrigins: [
       env.WEB_URL,
-      'http://localhost:3000',
-      'http://localhost:3001',
       // Mobile app deep-link scheme (standalone builds)
       `${mobileScheme}://`,
-      // Expo Go dev mode uses exp:// with the local network IP
-      'exp://**',
+      // Local web dev servers and Expo Go (exp:// with the LAN IP): never trusted in production.
+      ...(env.NODE_ENV === 'production' ? [] : ['http://localhost:3000', 'http://localhost:3001', 'exp://**']),
     ],
 
     user: {
@@ -113,7 +114,7 @@ export function createAuth(env: Env) {
           subject: 'Reset your password',
           html: emailHtml({
             heading: 'Reset your password',
-            body: `Hi ${user.name ?? user.email},<br><br>Click the button below to reset your password. The link expires in 1 hour.`,
+            body: `Hi ${escapeHtml(user.name || user.email)},<br><br>Click the button below to reset your password. The link expires in 1 hour.`,
             ctaLabel: 'Reset password',
             ctaUrl: url,
             footer: "If you didn't request a password reset, you can safely ignore this email.",
@@ -125,7 +126,9 @@ export function createAuth(env: Env) {
     account: {
       accountLinking: {
         enabled: true,
-        trustedProviders: ['google', 'github'],
+        // A trusted provider links even when it does not vouch for the email. Google always verifies
+        // it; GitHub can return an unverified address, so GitHub links only when it says verified.
+        trustedProviders: ['google'],
       },
     },
 
@@ -143,7 +146,7 @@ export function createAuth(env: Env) {
           subject: 'Verify your email',
           html: emailHtml({
             heading: 'Verify your email',
-            body: `Hi ${user.name ?? user.email},<br><br>Click the button below to verify your email address and activate your account.`,
+            body: `Hi ${escapeHtml(user.name || user.email)},<br><br>Click the button below to verify your email address and activate your account.`,
             ctaLabel: 'Verify email',
             ctaUrl: url,
             footer: "If you didn't create an account, you can safely ignore this email.",
@@ -162,6 +165,9 @@ export function createAuth(env: Env) {
           //    If a customer with that email already exists in Polar, catch the error and continue.
           // No-ops on the Polar side when POLAR_ACCESS_TOKEN is unset (local dev without Polar).
           after: async (newUser) => {
+            // Seats are matched by email, so only an address the user has proven they own may claim
+            // one. Unverified users are linked lazily once verified (see getTeamOwnerExternalId).
+            if (!newUser.emailVerified) return
             await db
               .update(polarMembers)
               .set({ externalId: newUser.id, updatedAt: new Date() })
@@ -199,6 +205,8 @@ export function createAuth(env: Env) {
     plugins: [
       expo(),
       organizationPlugin({
+        // Team orgs are created by the subscription webhook; clients cannot mint their own.
+        allowUserToCreateOrganization: false,
         organizationHooks: {
           beforeAddMember: async ({ organization: orgData }) => {
             await checkSeatLimit(orgData.id)
@@ -245,7 +253,7 @@ export function createAuth(env: Env) {
                   const [existingUser] = await db
                     .select({ id: user.id })
                     .from(user)
-                    .where(eq(user.email, m.email))
+                    .where(and(eq(user.email, m.email), eq(user.emailVerified, true)))
                     .limit(1)
                   resolvedExternalId = existingUser?.id ?? null
                 }
@@ -294,7 +302,7 @@ export function createAuth(env: Env) {
                   const [existingUser] = await db
                     .select({ id: user.id })
                     .from(user)
-                    .where(eq(user.email, seatEmail))
+                    .where(and(eq(user.email, seatEmail), eq(user.emailVerified, true)))
                     .limit(1)
                   resolvedExternalId = existingUser?.id ?? null
                 }

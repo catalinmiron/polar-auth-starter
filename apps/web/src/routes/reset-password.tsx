@@ -198,6 +198,7 @@ function ResetPasswordPage() {
         >
           {error && (
             <div
+              role="alert"
               className="rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-sm"
               style={{ color: 'var(--color-danger)' }}
             >
@@ -208,6 +209,7 @@ function ResetPasswordPage() {
           <TextField isRequired name="password" className="flex flex-col gap-1.5">
             <Label className="text-sm font-medium text-foreground-2">New password</Label>
             <Input
+              autoFocus
               type="password"
               autoComplete="new-password"
               minLength={8}

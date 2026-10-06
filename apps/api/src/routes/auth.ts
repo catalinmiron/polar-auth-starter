@@ -4,9 +4,13 @@ import type { Env } from '../env'
 
 export const auth = new Hono<{ Bindings: Env }>()
 
-// Browser origins allowed to call the API with credentials.
+export const isProduction = (env: Env) => env.NODE_ENV === 'production'
+
+// Browser origins allowed to call the API with credentials. Localhost only outside production:
+// otherwise any page served from a visitor's own machine could make credentialed calls.
 export function allowedOrigins(env: Env): string[] {
-  return [env.WEB_URL, 'http://localhost:3000', 'http://localhost:3001'].filter(Boolean)
+  const dev = isProduction(env) ? [] : ['http://localhost:3000', 'http://localhost:3001']
+  return [env.WEB_URL, ...dev].filter(Boolean)
 }
 
 function addCorsHeaders(response: Response, origin: string): Response {
@@ -47,7 +51,7 @@ auth.all('/*', async (c) => {
     response = await authInstance.handler(c.req.raw)
   } catch (err) {
     console.error('[auth] handler error:', err)
-    const msg = err instanceof Error ? err.message : String(err)
+    const msg = isProduction(c.env) ? 'Internal error' : err instanceof Error ? err.message : String(err)
     response = Response.json({ error: msg }, { status: 500 })
   }
   if (allowedOrigins(c.env).includes(origin)) return addCorsHeaders(response, origin)

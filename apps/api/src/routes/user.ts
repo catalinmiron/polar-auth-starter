@@ -11,7 +11,7 @@ import {
   verification as verificationTable,
 } from '@repo/db'
 import type { OnboardingStatus } from '@repo/types'
-import { and, eq, ne } from 'drizzle-orm'
+import { and, eq, inArray, ne } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { createAuth } from '../auth'
 import type { Env } from '../env'
@@ -30,6 +30,10 @@ function makePolar(env: Env) {
 }
 
 type Db = ReturnType<typeof createDb>
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const FRESH_SESSION_MS = 24 * 60 * 60 * 1000
+const ONBOARDING_STATUSES: Exclude<OnboardingStatus, 'none'>[] = ['started', 'dropped', 'finished']
 
 // Find the owner's externalId for the team a given user belongs to (as a member).
 // Only looks at role='member' rows — excludes the user's own 'owner' self-record that
@@ -50,7 +54,12 @@ async function getTeamOwnerExternalId(db: Db, userId: string): Promise<string | 
 
   // Fallback: externalId may not be synced yet — look up by user email and cache the link
   if (!memberCustomerId) {
-    const [u] = await db.select({ email: userTable.email }).from(userTable).where(eq(userTable.id, userId)).limit(1)
+    // Seats are matched by email, so the address must be one the user has proven they own.
+    const [u] = await db
+      .select({ email: userTable.email })
+      .from(userTable)
+      .where(and(eq(userTable.id, userId), eq(userTable.emailVerified, true)))
+      .limit(1)
     if (u) {
       const [byEmail] = await db
         .select({ customerId: polarMembers.customerId, id: polarMembers.id })
@@ -83,7 +92,7 @@ async function getTeamOwnerExternalId(db: Db, userId: string): Promise<string | 
   const [ownerUser] = await db
     .select({ id: userTable.id })
     .from(userTable)
-    .where(eq(userTable.email, owner.email))
+    .where(and(eq(userTable.email, owner.email), eq(userTable.emailVerified, true)))
     .limit(1)
   if (!ownerUser) return null
 
@@ -211,13 +220,17 @@ userRoutes.get('/team', async (c) => {
     const polarMemberList = page.result.items
 
     // Load existing DB values — status is webhook-driven, externalId may be locally resolved.
-    const dbRows = await db
-      .select({
-        id: polarMembers.id,
-        status: polarMembers.status,
-        externalId: polarMembers.externalId,
-      })
-      .from(polarMembers)
+    const memberIds = polarMemberList.map((m) => m.id)
+    const dbRows = memberIds.length
+      ? await db
+          .select({
+            id: polarMembers.id,
+            status: polarMembers.status,
+            externalId: polarMembers.externalId,
+          })
+          .from(polarMembers)
+          .where(inArray(polarMembers.id, memberIds))
+      : []
     const dbMap = new Map(dbRows.map((r) => [r.id, r]))
 
     // Sync member data into our DB.
@@ -232,7 +245,11 @@ userRoutes.get('/team', async (c) => {
         existing?.externalId ?? // We already resolved it
         (await (async () => {
           // Last resort: look up by email
-          const [u] = await db.select({ id: userTable.id }).from(userTable).where(eq(userTable.email, m.email)).limit(1)
+          const [u] = await db
+            .select({ id: userTable.id })
+            .from(userTable)
+            .where(and(eq(userTable.email, m.email), eq(userTable.emailVerified, true)))
+            .limit(1)
           return u?.id ?? null
         })())
 
@@ -336,8 +353,9 @@ userRoutes.post('/team/invite', async (c) => {
   const session = await getSessionOrFail(c.env, c.req.raw.headers)
   if (!session) return c.json({ error: 'Unauthorized' }, 401)
 
-  const { email } = await c.req.json<{ email: string }>()
-  if (!email) return c.json({ error: 'Email required' }, 400)
+  const body = await c.req.json<{ email?: unknown }>().catch(() => null)
+  const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : ''
+  if (!EMAIL_RE.test(email)) return c.json({ error: 'A valid email is required' }, 400)
 
   const polar = makePolar(c.env)
 
@@ -351,7 +369,7 @@ userRoutes.post('/team/invite', async (c) => {
     const [existingUser] = await db
       .select({ id: userTable.id })
       .from(userTable)
-      .where(eq(userTable.email, email))
+      .where(and(eq(userTable.email, email), eq(userTable.emailVerified, true)))
       .limit(1)
 
     const seat = await polar.customerSeats.assignSeat({
@@ -405,15 +423,21 @@ userRoutes.delete('/team/member/:id', async (c) => {
   const polar = makePolar(c.env)
 
   try {
-    // Revoke the seat first so Polar reflects the removal immediately.
+    // The access token can delete any member of any customer, so check ownership here: the caller
+    // must hold the team subscription, and the member must be on their team (and not the owner).
     const state = await polar.customers.getStateExternal({ externalId: session.user.id })
     const activeSub = state.activeSubscriptions?.[0]
-    if (activeSub) {
-      const seatsList = await polar.customerSeats.listSeats({ subscriptionId: activeSub.id })
-      const seat = seatsList.seats.find((s) => s.memberId === memberId)
-      if (seat) {
-        await polar.customerSeats.revokeSeat({ seatId: seat.id })
-      }
+    if (planForProduct(c.env, activeSub?.productId) !== 'team') return c.json({ error: 'No team subscription' }, 403)
+    const page = await polar.members.listMembers({ externalCustomerId: session.user.id })
+    const target = page.result.items.find((m) => m.id === memberId)
+    if (!target) return c.json({ error: 'Member not found' }, 404)
+    if (target.role === 'owner') return c.json({ error: 'The team owner cannot be removed' }, 400)
+
+    // Revoke the seat first so Polar reflects the removal immediately.
+    const seatsList = await polar.customerSeats.listSeats({ subscriptionId: activeSub!.id })
+    const seat = seatsList.seats.find((s) => s.memberId === memberId)
+    if (seat) {
+      await polar.customerSeats.revokeSeat({ seatId: seat.id })
     }
 
     await polar.members.deleteMember({ id: memberId })
@@ -432,6 +456,10 @@ userRoutes.delete('/team/member/:id', async (c) => {
 userRoutes.delete('/account', async (c) => {
   const session = await getSessionOrFail(c.env, c.req.raw.headers)
   if (!session) return c.json({ error: 'Unauthorized' }, 401)
+  // A stolen or forgotten-open session should not be enough to destroy the account.
+  if (Date.now() - new Date(session.session.createdAt).getTime() > FRESH_SESSION_MS) {
+    return c.json({ error: 'Please sign in again to delete your account.', code: 'SESSION_NOT_FRESH' }, 403)
+  }
 
   const userId = session.user.id
   const polar = makePolar(c.env)
@@ -445,7 +473,7 @@ userRoutes.delete('/account', async (c) => {
       const [membership] = await db
         .select({ id: polarMembers.id })
         .from(polarMembers)
-        .where(eq(polarMembers.externalId, userId))
+        .where(and(eq(polarMembers.externalId, userId), eq(polarMembers.role, 'member')))
         .limit(1)
 
       if (membership) {
@@ -495,10 +523,10 @@ userRoutes.patch('/onboarding', async (c) => {
   const session = await getSessionOrFail(c.env, c.req.raw.headers)
   if (!session) return c.json({ error: 'Unauthorized' }, 401)
 
-  const body = await c.req.json<{ status: Exclude<OnboardingStatus, 'none'> }>().catch(() => null)
-  if (!body?.status) return c.json({ error: 'Missing status' }, 400)
+  const body = await c.req.json<{ status?: unknown }>().catch(() => null)
+  const status = body?.status as Exclude<OnboardingStatus, 'none'>
+  if (!ONBOARDING_STATUSES.includes(status)) return c.json({ error: 'Invalid status' }, 400)
 
-  const { status } = body
   const db = createDb(c.env.DB)
 
   const [current] = await db

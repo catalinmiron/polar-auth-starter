@@ -103,3 +103,7 @@ For mobile builds, run `npx expo prebuild` in `apps/mobile` (native folders are 
 - **Seat-based teams.** Buying a Team plan auto-creates a better-auth organization. Polar seat webhooks mirror members into `polar_members` and sync better-auth `member` rows; `checkSeatLimit` blocks invites/adds past the purchased seat count.
 - **`bunfig.toml` matters.** The hoisted linker is required for the Expo app — Bun's default isolated linker duplicates native-module JS copies and breaks React Native.
 - **Workers constraint.** `createAuth(env)` is built per-request (no process-global env on Workers).
+
+## License
+
+[MIT](LICENSE)
